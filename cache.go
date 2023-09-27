@@ -1,3 +1,5 @@
+package cache
+
 /*
 MIT License
 
@@ -21,8 +23,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-
-package cache
 
 import (
 	"bufio"
@@ -116,6 +116,7 @@ type Adapter interface {
 func (client *Client) Middleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			c.Request().URL.ForceQuery = false
 			if !client.isAllowedPathToCache(c.Request().URL.String()) {
 				next(c)
 				return nil
@@ -142,7 +143,6 @@ func (client *Client) Middleware() echo.MiddlewareFunc {
 					c.Request().URL.RawQuery = params.Encode()
 					key = generateKey(c.Request().URL.String())
 
-					client.adapter.Release(key)
 				} else {
 					b, ok := client.adapter.Get(key)
 					response := BytesToResponse(b)
@@ -160,8 +160,6 @@ func (client *Client) Middleware() echo.MiddlewareFunc {
 							c.Response().Write(response.Value)
 							return nil
 						}
-
-						client.adapter.Release(key)
 					}
 				}
 
@@ -185,6 +183,7 @@ func (client *Client) Middleware() echo.MiddlewareFunc {
 						LastAccess: now,
 						Frequency:  1,
 					}
+					client.adapter.Release(key)
 					client.adapter.Set(key, response.Bytes(), response.Expiration)
 				}
 				//for k, v := range writer.Header() {
